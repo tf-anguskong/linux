@@ -1,0 +1,117 @@
+# 1. Turn on Automatic Updates - WIP
+# 2. Create limited user account, put in sudo group - Done
+# 3. Copy public key to server (ssh) - Done
+# 4. Harden SSH - Done
+# 5. Install UFW and Configure to allow for SSH - Done
+# 6. Reboot Server
+
+- name: Basic Linux Security
+  hosts: newservers
+  gather_facts: no
+  tasks:
+    # Step 1 - Apt Update & Upgrade, Install Automatic Updates
+    - name: Run apt-get update
+      apt: update_cache=yes force_apt_get=yes
+
+    - name: Upgrade all packages on servers
+      apt: upgrade=dist force_apt_get=yes
+
+    - name: Install Automatic Updates
+      apt:
+        name: unattended-upgrades
+        state: present
+
+    - name: Set Debian Automatic Upgrade Variables
+      debconf:
+        name: unattended-upgrades
+        question: unattended-upgrades/enable_auto_updates
+        vtype: boolean
+        value: "true"
+      notify: reconfigure unattended-upgrades
+
+    # Step 2 - LIMITED USER ACCOUNT CREATION
+    - name: Create User '<user>' and add to sudo group
+      ansible.builtin.user:
+        name: <user>
+        comment: Anguskong
+        uid: 3745
+        groups: sudo
+        shell: /bin/bash
+
+    - name: Unlock password and set it to empty
+      command: passwd -d <user>
+
+    - name: Expire password
+      command: chage -d 0 <user>
+
+    # Step 3 - Copy public key to server
+    - name: Set authorized key taken from file
+      authorized_key:
+        user: <user>
+        state: present
+        key: "{{ lookup('file', '/Users/<user>/.ssh/id_rsa.pub') }}"
+
+    # Step 4 - Harden SSH
+    - name: Change default SSH port to <#>
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        line: "Port <#>"
+        state: present
+
+    - name: Block IPv6 Address from SSH
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        line: "AddressFamily inet"
+
+    - name: Disable Password Authentication
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        line: "PasswordAuthentication no"
+        state: present
+
+    - name: Disable Password Authentication
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        line: "PasswordAuthentication yes"
+        state: absent
+
+    - name: deactivate PermitRootLogin
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        line: "PermitRootLogin no"
+        state: present
+
+    - name: ensure PermitRootLogin is not activated
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        line: "PermitRootLogin yes"
+        state: absent
+
+    - name: Restart SSHD post configuration
+      service:
+        name: sshd
+        state: restarted
+
+    # Step 5 - UFW and Implement Rules
+    - name: Install/Verify UFW Installation
+      apt:
+        name: ufw
+        state: present
+
+    - name: Modify /etc/ufw/before.rules to prevent ICMP Replies from Server
+      lineinfile:
+        path: "/etc/ufw/before.rules"
+        insertafter: "^# ok icmp codes for INPUT"
+        line: "-A ufw-before-input -p icmp --icmp-type echo-request -j DROP"
+        state: present
+
+    - name: Allow port 3745 (Custom SSH Port) and enable UFW
+      community.general.ufw:
+        rule: limit # prevents brute forcing, although password authentication is disabled
+        port: "<SSH Port #>"
+        proto: tcp
+        state: enabled
+
+    # Step 6 - Reboot Server
+    - name: Unconditionally reboot the machine with all defaults
+      reboot:
