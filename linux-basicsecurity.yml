@@ -1,3 +1,13 @@
+###################### Basic use Instructions ##########################
+# 1. Install ansible
+# 2. Install sshpass (sudo apt install sshpass, not REQUIRED)
+# 3. Install community.general ansible packages
+#   3a. ansible-galaxy collection install community.general
+# 4. ansible-playbook -u root -k -i <IP address>, linux-basicsecurity.yml
+#   4a. -u is the username used for SSH authentication, -k asks for SSH password, -i is the public IP
+
+########################################################################
+
 # 1. Turn on Automatic Updates - WIP
 # 2. Create limited user account, put in sudo group - Done
 # 3. Copy public key to server (ssh) - Done
